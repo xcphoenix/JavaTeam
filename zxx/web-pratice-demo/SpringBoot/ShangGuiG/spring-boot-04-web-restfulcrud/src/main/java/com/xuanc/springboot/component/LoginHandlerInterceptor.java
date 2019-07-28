@@ -25,7 +25,7 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
 
         Object user = request.getSession().getAttribute("loginUser");
-        String prefixInfo = ">>> " + request.getRequestURL() + " :: ";
+        String prefixInfo = ">>> " + request.getRequestURI() + " :: ";
 
         if (user == null) {
             logger.info(prefixInfo + "被拦截!");
@@ -33,7 +33,7 @@ public class LoginHandlerInterceptor implements HandlerInterceptor {
             request.getRequestDispatcher("/login.html").forward(request, response);
             return false;
         } else {
-            logger.info(prefixInfo + "放行！");
+            logger.info(prefixInfo + "放行~");
             return true;
         }
     }
