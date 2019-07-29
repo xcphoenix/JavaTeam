@@ -1,4 +1,4 @@
-# 一、SpringBoot Web学习笔记
+# SpringBoot 学习笔记
 
 ## 1.类路径
 
@@ -266,21 +266,39 @@ public class ThymeleafProperties {
 
 #### 2.语法
 
- 
+##### 1.简单表达式
 
+- ${...}
 
+  > 变量表达式
 
+- #{...}
 
+  > 消息表达式
 
-# yxh shige zhu
+##### 2.具体使用
 
+- th:text="${...}"
 
+  >  替换标签文本内容
 
+- th:utext="${...}"
 
+  > 同上，但不转义文本内容
 
+- th:each="a:${array} "
 
+  > 用a遍历array数组
 
+### 4.Restful
 
+[阮一峰](http://www.ruanyifeng.com/blog/2018/10/restful-api-best-practices.html)
+
+就是把请求方法类型利用起来，请求方法＋url＝目标操作
+
+eg:
+
+>  GET+orange = GET orange,意为获取一个橘子
 
 
 
