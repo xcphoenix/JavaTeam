@@ -296,13 +296,15 @@ public void addInterceptors(InterceptorRegistry registry) {
      
      ![](https://gitee.com/PhoenixBM/FigureBed/raw/picgo/img/20190724142359.png)
      
-     ![1563949458596](../images/1563949458596.png)
+     ![](https://gitee.com/PhoenixBM/FigureBed/raw/picgo/img/20190725103311.png)
+     
+     
      
   3. 引入片段的时候传入参数
   
      可以看到，当查看员工列表时，侧边栏本应该是 **员工管理** 被激活，高亮显示，我们如果想要用 Thymeleaf 来实现的话，可以在引用片段时传入参数，实现动态效果。
   
-     ![1563949654806](../images/1563949654806.png)
+     ![](https://gitee.com/PhoenixBM/FigureBed/raw/picgo/img/20190725103408.png)
   
      我们可以先把公用的页面放入一个页面，在引用片段时传入参数，通过参数判断是否添加 `active` 类。
   
@@ -322,11 +324,11 @@ public void addInterceptors(InterceptorRegistry registry) {
   
      eg: 2017-12-12 ---> Date：会发生数据转换、类型转换
   
-     **默认的时间格式**为（WebMvcProperties.java）：![](../images/20190724155632.png)
+     **默认的时间格式**为（WebMvcProperties.java）：![](https://gitee.com/PhoenixBM/FigureBed/raw/picgo/img/20190725103759.png)
   
      如果时间的格式不是默认所规定的格式，也没有修改配置，那么会发生错误：
   
-     ![1563955239381](../images/1563955239381.png)
+     ![](https://gitee.com/PhoenixBM/FigureBed/raw/picgo/img/20190725103823.png)
   
      可以修改配置文件来指定时间格式：
   

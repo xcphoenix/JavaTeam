@@ -300,13 +300,315 @@ eg:
 
 >  GET+orange = GET orange,意为获取一个橘子
 
+### 5.错误处理
+
+#### 1.错误访问时服务端反应
+
+浏览器返回html
+
+```html
+Whitelabel Error Page
+This application has no explicit mapping for /error, so you are seeing this as a fallback.
+
+Tue Jul 30 09:33:15 CST 2019
+There was an unexpected error (type=Not Found, status=404).
+No message available
+```
 
 
 
+客户端返回json
 
+```json
+{
+    "timestamp": "2019-07-30T01:31:27.089+0000",
+    "status": 404,
+    "error": "Not Found",
+    "message": "No message available",
+    "path": "/cccccc"
+}
+```
 
+#### 2.定制目标：
 
+1. 定制错误页面
 
+2. 定制错误json
+
+#### 3.步骤
+
+##### 1. 进入错误的自动配置类(ErrorMvcAutoConfiguration)
+
+基本组件
+
+---
+
+(1)DefaultErrorAttributes
+
+```java
+@Bean
+@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
+public DefaultErrorAttributes errorAttributes() {
+	return new DefaultErrorAttributes(this.serverProperties.getError().isIncludeException());
+	}
+```
+
+(2)BasicErrorController
+
+```java
+@Bean
+@ConditionalOnMissingBean(value = ErrorController.class, search = SearchStrategy.CURRENT)
+public BasicErrorController basicErrorController(ErrorAttributes errorAttributes) {
+	return new BasicErrorController(errorAttributes, this.serverProperties.getError(), this.errorViewResolvers);
+	}
+```
+
+(3)ErrorPageCustomizer
+
+```java
+/*
+	错误页面自定义类
+*/
+@Bean
+public ErrorPageCustomizer errorPageCustomizer() {
+	return new ErrorPageCustomizer(this.serverProperties, this.dispatcherServletPath);
+}
+```
+
+(4)DefaultErrorViewResolver
+
+```java
+/*
+	默认错误视图解析器
+*/
+@Bean
+@ConditionalOnBean(DispatcherServlet.class)
+@ConditionalOnMissingBean
+public DefaultErrorViewResolver conventionErrorViewResolver() {
+	return new DefaultErrorViewResolver(this.applicationContext, this.resourceProperties);
+}
+```
+
+##### 2错误响应流程
+
+###### 1.错误页面的生成
+
+进入ErrorPageCustomizer类
+
+找到注册错误页面的方法
+
+```java
+@Override
+public void registerErrorPages(ErrorPageRegistry errorPageRegistry) {
+	ErrorPage errorPage = new ErrorPage(
+        this.dispatcherServletPath.getRelativePath(this.properties.getError().getPath()));
+	errorPageRegistry.addErrorPages(errorPage);
+}
+```
+
+即通过*this.properties.getError().getPath()*的返回值为路径构造*ErrorPage*
+
+进入*this.properties.getError().getPath()*方法
+
+```java
+/**
+ * Configuration properties for web error handling.
+	．．．
+ */
+public class ErrorProperties {
+
+	．．．
+
+	public String getPath() {
+		return this.path;
+	}
+```
+
+找到*path*的定义
+
+```java
+/**
+ * Path of the error controller.
+ */
+	@Value("${error.path:/error}")
+	private String path = "/error";
+```
+
+即*path*默认值为"/error"
+
+若获取不到${error.path}的值，则*path*为默认值"/error"
+
+###### 2.处理/*path*请求
+
+处理由BasicErrorController类完成，上一步生成了url，自然需要一个controller来处理
+
+进入BasicErrorController类
+
+```java
+@Controller
+@RequestMapping("${server.error.path:${error.path:/error}}")
+	public class BasicErrorController extends AbstractErrorController {
+
+	．．．
+｝
+```
+
+可以看到这个controller接受*server.error.path* or *error.path* or */error*的映射，优先级从高到低，若前两个变量都没有值则默认为"/error"
+
+具体如何处理：
+
+```java
+@RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+public ModelAndView errorHtml(HttpServletRequest request, HttpServletResponse response) {
+	HttpStatus status = getStatus(request);
+	Map<String, Object> model = Collections
+			.unmodifiableMap(getErrorAttributes(request, isIncludeStackTrace(request, MediaType.TEXT_HTML)));
+	response.setStatus(status.value());
+	ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+	return (modelAndView != null) ? modelAndView : new ModelAndView("error", model);
+}
+
+@RequestMapping
+public ResponseEntity<Map<String, Object>> error(HttpServletRequest request) {
+	Map<String, Object> body = getErrorAttributes(request,isIncludeStackTrace(request, MediaType.ALL));
+	HttpStatus status = getStatus(request);
+	return new ResponseEntity<>(body, status);
+}
+```
+
+上面有两种对*/path*的处理方法
+
+- @RequestMapping(produces = MediaType.TEXT_HTML_VALUE)
+
+  > 返回html类型数据，则对请求头中标示了接收text\html的请求有效，浏览器就是其一
+
+- @RequestMapping
+
+  > 被该controller映射且没被上面方法处理的被该方法处理
+
+###### 3.寻找视图文件
+
+第一种如何产生视图
+
+```java
+ModelAndView modelAndView = resolveErrorView(request, response, status, model);
+```
+
+进入resolveErrorView方法
+
+```java
+	/**
+	 * Resolve any specific error views. By default this method delegates to
+	 * {@link ErrorViewResolver ErrorViewResolvers}.
+	 ...
+	 */
+	protected ModelAndView resolveErrorView(HttpServletRequest request, HttpServletResponse response, HttpStatus status,Map<String, Object> model) {
+		for (ErrorViewResolver resolver : this.errorViewResolvers) {
+			ModelAndView modelAndView = resolver.resolveErrorView(request, status, model);
+			if (modelAndView != null) {
+				return modelAndView;
+			}
+		}
+		return null;
+	}
+```
+
+注释：解析任何特定的错误视图．默认情况下此方法委托给类ErrorViewResolver
+
+DefaultErrorViewResolver继承了ErrorViewResolver
+
+进入DefaultErrorViewResolver
+
+```java
+@Override
+public ModelAndView resolveErrorView(HttpServletRequest request, HttpStatus status, Map<String, Object> model) {
+	ModelAndView modelAndView = resolve(String.valueOf(status.value()), model);
+	if (modelAndView == null && SERIES_VIEWS.containsKey(status.series())) {
+		modelAndView = resolve(SERIES_VIEWS.get(status.series()), model);
+	}
+	return modelAndView;
+}
+```
+
+resolveErrorView通过resolve()方法获取ModelAndView,并传入了状态码的字符串和一个map对象
+
+而resolve方法如下
+
+```java
+private ModelAndView resolve(String viewName, Map<String, Object> model) {
+	String errorViewName = "error/" + viewName;
+	TemplateAvailabilityProvider provider = this.templateAvailabilityProviders.getProvider(errorViewName,
+			this.applicationContext);
+	if (provider != null) {
+		return new ModelAndView(errorViewName, model);
+	}
+	return resolveResource(errorViewName, model);
+}
+```
+
+可以看出该方法是以状态码作为视图名的，并且默认视图文件放在路径**"error/"**下
+
+下面几行大概意思是用模板引擎解析视图文件，成功则返回，失败则调用**resolveResource()**方法
+
+进入resolveResource()方法
+
+```java
+private ModelAndView resolveResource(String viewName, Map<String, Object> model) {
+	for (String location : this.resourceProperties.getStaticLocations()) {
+		try {
+			Resource resource = this.applicationContext.getResource(location);
+			resource = resource.createRelative(viewName + ".html");
+			if (resource.exists()) {
+				return new ModelAndView(new HtmlResourceView(resource), model);
+			}
+		}
+		catch (Exception ex) {
+		}
+	}
+	return null;
+}
+```
+
+下面这几行就很熟悉了，获取静态资源路径，给视图名拼接上".html"，判断资源是否存在于静态资源路径下
+
+如果存在，则返回模型和视图，如果还不存在，则抛出异常，返回null
+
+## 4.内嵌容器
+
+### 1.配置修改
+
+#### 1.使用applicatioin.properties配置文件
+
+##### 1.通用servlet配置
+
+```java
+server.xxx=
+```
+
+##### 2．tomcat配置
+
+```java
+server.tomcat.xxx=
+```
+
+分析
+
+```java
+@ConfigurationProperties(prefix = "server", ignoreUnknownFields = true)
+public class ServerProperties {
+	...
+    /**
+	 * Tomcat properties.
+	 */
+	public static class Tomcat {
+    	...
+    }
+}
+```
+
+即ServerProperties为web容器的配置类
+
+#### 2. 
 
 
 
@@ -352,3 +654,62 @@ eg:
 */
 ```
 
+### 3.@ConditionalOnMissingBean()
+
+```java
+/*
+	当括号里面的类没有时该注解装饰的类生效
+*/
+```
+
+## 2.单词积累
+
+### 1.resolve
+
+> 解析
+
+### 2.instance
+
+> 实例
+
+### 3.conditional
+
+> 条件
+
+### 4.customizer
+
+> 定制
+
+### 5.relative
+
+> adj.相对的 
+>
+> n.亲戚
+
+### 6.delegates
+
+> n.代表
+>
+> v.授权
+
+### 7.convention
+
+> 惯例
+
+### 8.embedded
+
+> 嵌入式
+
+## 3.学习过程总结的东西
+
+### 1.关于xxxProperties配置类
+
+- 开始的静态资源配置在resourceProperties类里面
+
+- 之后的错误处理配置在ErrorProperties类里面
+
+- 刚才servlet容器的配置在ServerProperties类里面
+
+  我猜springboot所有有关yyy配置的类都在一个yyyProperties类里面
+
+  通过指定前缀，在application.properties文件中以**前缀．yyy.xxx=**来配置

@@ -61,5 +61,6 @@ out/
 *.tmp
 temp/
 tmp/
+logs/
 .ideaLib/ 
 *.attach_pid*
