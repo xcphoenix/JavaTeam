@@ -608,17 +608,150 @@ public class ServerProperties {
 
 即ServerProperties为web容器的配置类
 
-#### 2. 
+#### 2. 实现配置类
+
+```java
+@Bean
+public WebServerFactoryCustomizer<ConfigurableWebServerFactory> webServerFactoryWebServerFactoryCustomizer()
+{
+     return new WebServerFactoryCustomizer<ConfigurableWebServerFactory>() {
+        @Override
+        public void customize(ConfigurableWebServerFactory factory) {
+            factory.setPort(8080);
+            factory.setXxx();
+            ...
+        }
+    };
+}
+```
+
+### 2.注册组件
+
+#### 1.servlet
+
+首先写一个类继承HttpServlet,实现自己想要重写的方法
+
+```java
+public class MyServlet extends HttpServlet {
+@Override
+protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {	
+        resp.getWriter().write("myServlet");
+    }
+}
+```
+
+然后在配置类里面注册一个返回ServletRegistrationBean的bean
+
+```java
+@Bean
+public ServletRegistrationBean myServlet()
+{
+    ServletRegistrationBean registrationBean = new ServletRegistrationBean(new MyServlet(),"/myServlet");
+    return registrationBean;
+}
+```
+
+使用有参构造器
+
+```java
+	public ServletRegistrationBean(T servlet, String... urlMappings) {
+		this(servlet, true, urlMappings);
+	}
+```
+
+传入自己写的servlet和想要映射的url即可
+
+#### 2.filter
+
+首先写一个类实现Filter接口
+
+```java
+public class MyFilter implements Filter {
+	...
+}
+```
+
+```java
+@Override
+public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+    System.out.println("过滤");
+    chain.doFilter(request,response);
+}
+```
+
+过滤操作不止一个，自定义的过滤器执行完后过滤器链的下一个过滤器接着执行
+
+```java
+@Bean
+public FilterRegistrationBean myFilter()
+{
+    FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(new MyFilter());
+    Collection<String> collection = new HashSet<>();
+    collection.add("/myFilter");
+    filterRegistrationBean.setUrlPatterns(collection);
+    return filterRegistrationBean;
+}
+```
+
+#### 3.listener
+
+同上
+
+```java
+public class MyListener implements ServletContextListener {
+    @Override
+    public void contextInitialized(ServletContextEvent sce) {
+        System.out.println("监听器初始化");
+    }
+
+    @Override
+    public void contextDestroyed(ServletContextEvent sce) {
+        System.out.println("监听器销毁");
+    }
+}
+```
 
 
 
+```java
+@Bean
+public FilterRegistrationBean myFilter()
+{
+    FilterRegistrationBean filterRegistrationBean = new FilterRegistrationBean(new MyFilter());
+    Collection<String> collection = new HashSet<>();
+    collection.add("/myFilter");
+    filterRegistrationBean.setUrlPatterns(collection);
+    return filterRegistrationBean;
+}
+```
 
+### 3.切换容器
 
+首先将当前容器隔离
 
+```xml
+<exclusions>
+	<exclusion>
+        <artifactId>spring-boot-starter-tomcat</artifactId
+        <groupId>org.springframework.boot</groupId>
+    </exclusion>
+</exclusions>
+```
 
+引入xxx依赖即可
 
+```xml
+<dependency>
+    <artifactId>spring-boot-starter-xxx</artifactId>
+    <groupId>org.springframework.boot</groupId>
+</dependency>
+```
 
+目前springboot中可以切换三种容器
 
+- tomcat
+- jetty
+- undertow
 
 
 
