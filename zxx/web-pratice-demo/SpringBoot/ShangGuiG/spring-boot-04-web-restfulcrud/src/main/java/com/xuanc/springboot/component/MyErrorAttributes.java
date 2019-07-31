@@ -31,7 +31,7 @@ public class MyErrorAttributes extends DefaultErrorAttributes {
     public MyErrorAttributes(MyErrorConf myErrorConf) {
         super(myErrorConf.isIncludeException());
         this.myErrorConf = myErrorConf;
-        System.out.println(myErrorConf);
+        LoggerFactory.getLogger(this.getClass()).info(this.myErrorConf.toString());
     }
 
     @Override

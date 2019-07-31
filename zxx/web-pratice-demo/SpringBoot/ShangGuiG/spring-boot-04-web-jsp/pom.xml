@@ -9,9 +9,10 @@
 		<relativePath /> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.xuanc</groupId>
-	<artifactId>spring-boot-04-web-restfulcrud</artifactId>
+	<artifactId>spring-boot-04-web-jsp</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
-	<name>spring-boot-04-web-restfulcrud</name>
+	<packaging>war</packaging>
+	<name>spring-boot-04-web-jsp</name>
 	<description>Demo project for Spring Boot</description>
 	
 	<properties>
@@ -22,42 +23,17 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-web</artifactId>
-			<exclusions>
-				<exclusion>
-					<artifactId>spring-boot-starter-tomcat</artifactId>
-					<groupId>org.springframework.boot</groupId>
-				</exclusion>
-			</exclusions>
-		</dependency>
-		
-		<!-- 引入其他的 Web 容器 -->
-		<dependency>
-			<artifactId>spring-boot-starter-jetty</artifactId>
-			<groupId>org.springframework.boot</groupId>
 		</dependency>
 		
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-thymeleaf</artifactId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+			<scope>provided</scope>
 		</dependency>
-		
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
 			<scope>test</scope>
-		</dependency>
-		
-		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-configuration-processor</artifactId>
-			<optional>true</optional>
-		</dependency>
-		
-		<!-- JQuery -->
-		<dependency>
-			<groupId>org.webjars</groupId>
-			<artifactId>jquery</artifactId>
-			<version>3.4.1</version>
 		</dependency>
 	</dependencies>
 	
@@ -66,14 +42,6 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
-			<!-- 热部署 -->
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-				<configuration>
-					<fork>true</fork>
-				</configuration>
 			</plugin>
 		</plugins>
 	</build>
