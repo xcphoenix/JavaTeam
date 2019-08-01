@@ -1,10 +1,10 @@
 # SpringBoot 学习笔记
 
-## 1.类路径
+## 一.类路径
 
 IDEA项目中，resources目录和java目录为类路径根目录
 
-## 2.映射关系
+## 二.映射关系
 
 ### 1.普通静态资源映射
 
@@ -204,7 +204,7 @@ spring.resources.static-locations=path1,path2,...
 
 > 一旦配置该属性，则apringboot 默认配置被覆盖
 
-## 3.模板引擎(Thymeleaf)
+## 三.模板引擎(Thymeleaf)
 
 理解：按一定的语法将给定的数据填充到写好的模板里
 
@@ -573,7 +573,7 @@ private ModelAndView resolveResource(String viewName, Map<String, Object> model)
 
 如果存在，则返回模型和视图，如果还不存在，则抛出异常，返回null
 
-## 4.内嵌容器
+## 四.Servlet容器(内嵌)
 
 ### 1.配置修改
 
@@ -753,11 +753,17 @@ public FilterRegistrationBean myFilter()
 - jetty
 - undertow
 
+### 4. 外置(servlet)容器
 
+- 创建项目时建为war项目，并添加webapp目录
 
+- 将嵌入式的servlet容器的<scope/>设置为provided
 
+- 必须有一个SpringBootServletInitializer的子类
 
+作用：外置tomcat支持jsp
 
+## 五．数据访问
 
 
 
@@ -832,6 +838,10 @@ public FilterRegistrationBean myFilter()
 ### 8.embedded
 
 > 嵌入式
+
+### 9.generate
+
+> 生成
 
 ## 3.学习过程总结的东西
 
