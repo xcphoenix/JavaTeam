@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3333/jwt_test?useAffectedRows=true
+    username: root
+    password: root
+    # 自动创建数据库表
+    schema: classpath:sql/createUser.sql
+    initialization-mode: always
+
+mybatis:
+  config-location: classpath:mybatis/mybatis-config.xml
+  mapper-locations: classpath:mybatis/mapper/*.xml
+
+debug: true
