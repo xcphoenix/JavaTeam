@@ -29,9 +29,9 @@ spring boot配置的这个方法返回一个映射器作为bean来处理映射�
 
 ```java
 @Bean
-        public WelcomePageHandlerMapping welcomePageHandlerMapping(ApplicationContext applicationContext) {
-            return new WelcomePageHandlerMapping(new TemplateAvailabilityProviders(applicationContext), applicationContext, this.getWelcomePage(), this.mvcProperties.getStaticPathPattern());
-        }
+public WelcomePageHandlerMapping welcomePageHandlerMapping(ApplicationContext applicationContext) {
+        return new WelcomePageHandlerMapping(new TemplateAvailabilityProviders(applicationContext), applicationContext, this.getWelcomePage(), this.mvcProperties.getStaticPathPattern());
+}
 ```
 
 this.getWelcomePage()：首页的静态资源文件路径
@@ -63,8 +63,8 @@ private static final String[] CLASSPATH_RESOURCE_LOCATIONS = new String[]{"class
 该方法默认页面名为index.html，把传入的路径与＂index.html＂拼接起来查找静态资源
 */
 private Resource getIndexHtml(String location) {
-            return this.resourceLoader.getResource(location + "index.html");
-        }
+    return this.resourceLoader.getResource(location + "index.html");
+}
 ```
 
 
@@ -202,7 +202,7 @@ prefix = "spring.resources"
 spring.resources.static-locations=path1,path2,...
 ```
 
-> 一旦配置该属性，则apringboot 默认配置被覆盖
+> 一旦配置该属性，则springboot 默认配置被覆盖
 
 ## 三.模板引擎(Thymeleaf)
 
@@ -765,6 +765,432 @@ public FilterRegistrationBean myFilter()
 
 ## 五．数据访问
 
+### 1.数据源的自动配置分析
+
+进入自动配置的jia包
+
+找到DataSource的配置类
+
+进入DataSourceConfiguration类
+
+```java
+	@Configuration
+	@ConditionalOnClass(org.apache.tomcat.jdbc.pool.DataSource.class)
+	@ConditionalOnMissingBean(DataSource.class)
+	@ConditionalOnProperty(name = "spring.datasource.type", havingValue = "org.apache.tomcat.jdbc.pool.DataSource",
+			matchIfMissing = true)
+	static class Tomcat {
+
+		@Bean
+		@ConfigurationProperties(prefix = "spring.datasource.tomcat")
+        ...
+    }
+
+	@Configuration
+	@ConditionalOnClass(HikariDataSource.class)
+	@ConditionalOnMissingBean(DataSource.class)
+	@ConditionalOnProperty(name = "spring.datasource.type", havingValue = 
+                           "com.zaxxer.hikari.HikariDataSource",
+		matchIfMissing = true)
+	static class Hikari {
+
+		@Bean
+		@ConfigurationProperties(prefix = "spring.datasource.hikari")
+        ...
+    }
+```
+
+下面还有
+
+```java
+static class Dbcp2
+static class Generic
+```
+
+结构都差不多，就不贴代码了
+
+从最上面可以看出，要选择使用哪个数据源是在application.properties文件里面用*spring.datasource.type*属性指定的，该属性值类型为数据源完整类名
+
+从刚才的代码运行中得出默认数据源为　**com.zaxxer.hikari.HikariDataSource**
+
+即默认
+
+```properties
+spring.datasource.type=com.zaxxer.hikari.HikariDataSource
+```
+
+而*com.zaxxer.hikari.HikariDataSource*类内部属性的配置由上代码可知为
+
+```properties
+spring.datasource.hikari＝xxx
+```
+
+其余类推即可
+
+### 2.DDL和DML的执行
+
+首先找到初始化数据资源的类并进入
+
+```java
+class DataSourceInitializer {
+
+	...
+
+DataSourceInitializer(DataSource dataSource, DataSourceProperties properties, ResourceLoader resourceLoader) {
+		this.dataSource = dataSource;
+		this.properties = properties;
+		this.resourceLoader = (resourceLoader != null) ? resourceLoader : new DefaultResourceLoader();
+	}
+    ...
+}
+```
+
+可以看见构造器中传入了三个对象
+
+- DataSource
+- DataSourceProperties
+- ResourceLoader
+
+#### 1.DataSource
+
+先说DataSource
+
+```java
+
+/**
+...
+ * The {@code DataSource} interface is implemented by a driver vendor.
+...
+ * A {@code DataSource} object has properties that can be modified
+ * when necessary.  For example, if the data source is moved to a different
+ * server, the property for the server can be changed.  The benefit is that
+ * because the data source's properties can be changed, any code accessing
+ * that data source does not need to be changed.
+ *...
+ * @since 1.4
+ */
+
+public interface DataSource  extends CommonDataSource, Wrapper {
+  
+  Connection getConnection() throws SQLException;
+
+  Connection getConnection(String username, String password)
+    throws SQLException;
+}
+
+```
+
+- The {@code DataSource} interface is implemented by a driver vendor.
+
+  > 这个接口由驱动程序供应商提供
+
+- 意味着这个接口使得在数据源变化的情况下通过更改其属性而避免改动代码
+
+知道这个类通过用户名和密码返回连接就可以了
+
+#### 2.ResourceLoader
+
+引用类中的描述
+
+```java
+@param resourceLoader the resource loader to use (can be null)
+```
+
+ResourceLoader接口中的注释：
+
+```java
+/**
+ * Strategy interface for loading resources (e.. class path or file system
+ * resources)
+ */
+```
+
+#### 3.DataSourceProperties
+
+看这个类名格式是不是很熟悉
+
+xxxProperties
+
+就是DataSource的配置类么
+
+进去看看
+
+```java
+/**
+ * Base class for configuration of a data source.
+ */
+@ConfigurationProperties(prefix = "spring.datasource")
+public class DataSourceProperties implements BeanClassLoaderAware, InitializingBean {
+
+}
+```
+
+- 要配置该类的属性，在application.yml/properties中以*spring.datasource*开头
+
+看看第一个方法
+
+```java
+/**
+ * Create the schema if necessary.
+ * @return {@code true} if the schema was created
+ * @see DataSourceProperties#getSchema()
+ */
+public boolean createSchema() {
+	List<Resource> scripts = getScripts("spring.datasource.schema", 
+        this.properties.getSchema(), "schema");
+	if (!scripts.isEmpty()) {
+		if (!isEnabled()) {
+			logger.debug("Initialization disabled (not running DDL scripts)");
+			return false;
+		}
+		String username = this.properties.getSchemaUsername();
+		String password = this.properties.getSchemaPassword();
+		runScripts(scripts, username, password);
+	}
+	return !scripts.isEmpty();
+}
+```
+
+这就是初始化DDL的方法
+
+方法一开始就调用*getScripts()*方法试图获取DDL资源列表，并传入三个参数
+
+- spring.datasource.schema 
+
+  > 配置文件中的属性名
+
+- this.properties.getSchema()
+
+  > 该函数返回配置类中schema的值，schema为**List<String>类型**
+
+- "schema"
+
+分析该函数
+
+```java
+private List<Resource> getScripts(String propertyName, List<String> resources, String fallback) {
+	if (resources != null) {
+		return getResources(propertyName, resources, true);
+	}
+	String platform = this.properties.getPlatform();
+	List<String> fallbackResources = new ArrayList<>();
+	fallbackResources.add("classpath*:" + fallback + "-" + platform + ".sql");
+	fallbackResources.add("classpath*:" + fallback + ".sql");
+	return getResources(propertyName, fallbackResources, false);
+}
+```
+
+该函数判断schema列表是否为空，
+
+若为空
+
+- 未在配置文件中指定DDL资源位置，schema == null，则查找默认的路径文件
+- 其中fallback为"schema",platform默认为"all"，可在配置文件中修改
+- 即该方法会去寻找类路径下的*schema-all.sql*或*schema.sql*
+
+否则
+
+- 已经指定路径，则通过*getResources()*方法将指定位置的资源加载到资源对象列表中并返回
+
+**注意:**spring boot 2.0x后，DataSourceProperties类中多了一个属性
+
+```java
+/**
+ * Initialize the datasource with available DDL and DML scripts.
+ */
+private DataSourceInitializationMode initializationMode = 
+    DataSourceInitializationMode.EMBEDDED;
+
+```
+
+进入 DataSourceInitializationMode 类
+
+```java
+public enum DataSourceInitializationMode {
+
+	/**
+	 * Always initialize the datasource.
+	 */
+	ALWAYS,
+
+	/**
+	 * Only initialize an embedded datasource.
+	 */
+	EMBEDDED,
+
+	/**
+	 * Do not initialize the datasource.
+	 */
+	NEVER
+
+}
+
+```
+
+可能是因为数据库非嵌入资源，而这里默认是只初始化嵌入资源，所以不会去初始化DDL资源，在配置文件中改为ＡＬＷＡＹＳ即可
+
+```yaml
+spring:
+  datasource:
+    ...
+    initialization-mode: always
+```
+
+这样启动springboot时，DDL资源就会被执行
+
+DML的过程也差不多
+
+```java
+/**
+ * Initialize the schema if necessary.
+ * @see DataSourceProperties#getData()
+ */
+public void initSchema() {
+	List<Resource> scripts = getScripts("spring.datasource.data", this.properties.getData(), "data");
+	if (!scripts.isEmpty()) {
+		if (!isEnabled()) {
+			logger.debug("Initialization disabled (not running data scripts)");
+			return;
+		}
+		String username = this.properties.getDataUsername();
+		String password = this.properties.getDataPassword();
+		runScripts(scripts, username, password);
+	}
+}
+```
+
+调用的方法都一样，只是schema换成了data
+
+配置类中的data属性：
+
+```java
+/**
+ * Data (DML) script resource references.
+ */
+private List<String> data;
+```
+
+和schema一样的类型
+
+剩下的就不多说了
+
+### 3.jdbc操作数据库
+
+自动配置类的jdbc包下有
+
+```java
+@Bean
+@Primary
+@ConditionalOnMissingBean(JdbcOperations.class)
+public JdbcTemplate jdbcTemplate() {
+	JdbcTemplate jdbcTemplate = new JdbcTemplate(this.dataSource);
+	JdbcProperties.Template template = this.properties.getTemplate();
+	jdbcTemplate.setFetchSize(template.getFetchSize());
+	jdbcTemplate.setMaxRows(template.getMaxRows());
+	if (template.getQueryTimeout() != null) {
+		jdbcTemplate.setQueryTimeout((int) template.getQueryTimeout().getSeconds());
+	}
+	return jdbcTemplate;
+}
+```
+
+使用的时候直接
+
+```java
+/**
+ * @author galaxy
+ * @date 19-8-2 - 下午4:34
+ */
+@Controller
+public class jdbcTest {
+
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+
+    @RequestMapping("/query")
+    @ResponseBody
+    public Map<String,Object> jdbcSearch()
+    {
+        List<Map<String,Object>> list = jdbcTemplate.queryForList("select * from test");
+        return list.get(0);
+    }
+}
+```
+
+请求结果
+
+```json
+{"name":"ll","sex":"0"}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -793,13 +1219,41 @@ public FilterRegistrationBean myFilter()
 */
 ```
 
-### 3.@ConditionalOnMissingBean()
+### 3.@ConditionalOnMissingBean(xxx.class)
 
 ```java
 /*
 	当括号里面的类没有时该注解装饰的类生效
 */
 ```
+
+### 4.@ConditionalOnProperty(name=xxx,havingValue=xxx)
+
+```java
+/*
+	当properies配置文件中有名为"spring.datasource.type"且值		　　
+	为"org.apache.tomcat.jdbc.pool.DataSource"的配置时，启用该类
+*/
+即spring.datasource.type=org.apache.tomcat.jdbc.pool.DataSource
+
+@ConditionalOnProperty(name = "spring.datasource.type", havingValue = "org.apache.tomcat.jdbc.pool.DataSource",matchIfMissing = true)
+
+```
+
+### 5.@ConditionalOnClass(xxx.class)
+
+```java
+/*
+	当有括号中的类或其子类时，该注解注释类生效
+*/
+例如
+@ConditionalOnClass(org.apache.tomcat.jdbc.pool.DataSource.class)
+/*
+	当检测到有org.apache.tomcat.jdbc.pool.DataSource类存在时，启用该注解注释的类
+*/
+```
+
+
 
 ## 2.单词积累
 
@@ -842,6 +1296,10 @@ public FilterRegistrationBean myFilter()
 ### 9.generate
 
 > 生成
+
+### 10.strategy
+
+> 策略
 
 ## 3.学习过程总结的东西
 
