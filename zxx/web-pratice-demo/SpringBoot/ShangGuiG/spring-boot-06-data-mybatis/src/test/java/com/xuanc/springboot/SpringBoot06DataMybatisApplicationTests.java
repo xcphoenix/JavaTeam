@@ -12,7 +12,7 @@ import java.sql.SQLException;
 
 @RunWith(SpringRunner.class)
 @SpringBootTest
-public class SpringBoot06DataJdbcApplicationTests {
+public class SpringBoot06DataMybatisApplicationTests {
 
     @Resource
     DataSource dataSource;
@@ -20,7 +20,6 @@ public class SpringBoot06DataJdbcApplicationTests {
     @Test
     public void contextLoads() throws SQLException {
         System.out.println(dataSource.getClass());
-
         Connection connection = dataSource.getConnection();
         System.out.println(connection);
         connection.close();
