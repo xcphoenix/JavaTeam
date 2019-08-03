@@ -1123,27 +1123,270 @@ public class jdbcTest {
 {"name":"ll","sex":"0"}
 ```
 
+### 4.整合数据源(Druid)
+
+#### 1.绑定参数
+
+阿里的druid源
+
+```xml
+<dependency>
+    <groupId>com.alibaba</groupId>
+    <artifactId>druid</artifactId>
+    <version>1.1.19</version>
+</dependency>
+```
+
+上面说过了，在yml文件中把type的值设置为duruid的完全限定类名
+
+```yaml
+spring:
+  datasource:
+    ...
+    type: com.alibaba.druid.pool.DruidDataSource
+```
+
+##### 1.配置bean
+
+##### 创建DruidDataSource的bean,因为这样可以用注解将application.yml/properties文件中配置的对应属性的值绑定到bean
+
+```yml
+peispring:
+  datasource:
+    username: root
+    password: 123456
+    url: jdbc:mysql://127.0.0.1:3306/jdbc
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    initialization-mode: always
+    platform: linux
+    #type: com.alibaba.druid.pool.DruidDataSource
 
 
+    #   数据源其他配置
+    initialSize: 5
+    minIdle: 5
+    maxActive: 20
+    maxWait: 60000
+    timeBetweenEvictionRunsMillis: 60000
+    minEvictableIdleTimeMillis: 300000
+    validationQuery: SELECT 1 FROM DUAL
+    testWhileIdle: true
+    testOnBorrow: false
+    testOnReturn: false
+    poolPreparedStatements: true
+    #   配置监控统计拦截的filters，去掉后监控界面sql无法统计，'wall'用于防火墙
+    filters: stat,wall,slf4j
+    maxPoolPreparedStatementPerConnectionSize: 20
+    useGlobalDataSourceStat: true
+    connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=500
+
+```
+
+配置的bean
+
+```java
+@Configuration
+public class MyDruidConfig {
 
 
+    @ConfigurationProperties(prefix = "spring.datasource")
+    @Bean
+    public DruidDataSource myDruidSourceConfig()
+    {
+        return new DruidDataSource();
+    }
+}
+```
 
+type: com.alibaba.druid.pool.DruidDataSource使用默认值启动数据源
 
+当使用了bean配置驱动时，yml/properties中的配置覆盖默认配置，type属性可以不配置
 
+##### 2.引入starter
 
+druid[参考文档](https://github.com/alibaba/druid/wiki/%E5%B8%B8%E8%A7%81%E9%97%AE%E9%A2%98)
 
+[如何在Spring Boot中集成Druid连接池和监控？](https://github.com/alibaba/druid/tree/master/druid-spring-boot-starter)
 
+引入
 
+```xml
+<dependency>
+   <groupId>com.alibaba</groupId>
+   <artifactId>druid-spring-boot-starter</artifactId>
+   <version>1.1.17</version>
+</dependency>
+```
 
+引入该jar后springboot就可自动读取application.properties/yml下的配置，就不用使用bean来配置了
 
+#### 2.servlet配置
 
+内置监控页面的servlet
 
+[内置监控页面是一个Servlet，具体配置看这里](https://github.com/alibaba/druid/tree/master/druid-spring-boot-starter)
 
+文档中使用xml的配置方法，下面我使用java配置
 
+```java
+    /**
+     * 注册druid的监控servlet用于提供监控服务
+     * 以便使用Druid的内置监控页面
+     */
+    @Bean
+    public ServletRegistrationBean servletRegistrationBean()
+    {
+        ServletRegistrationBean bean = new ServletRegistrationBean(new StatViewServlet(),"/druid/*");
+        Map<String,String> map = new HashMap<>();
+        map.put("loginUsername","admin");
+        map.put("loginPassword","123456");
+        map.put("allow","");
+        map.put("deny","127.0.0.2 ");
+        bean.setInitParameters(map);
+        return bean;
+    }
+```
 
+使用*ServletRegistrationBean*类向容器注册一个servlet并设置其映射规则
 
+用Map传入起初始化所需参数
 
+则内置监控页面的首页是/druid/index.html
 
+例如：
+http://localhost:8080/druid/index.html 
+
+#### 3.filter配置
+
+配置WebStatFilter
+
+> WebStatFilter用于采集web-jdbc关联监控的数据。
+
+[配置WebStatFilter官方文档](https://github.com/alibaba/druid/wiki/%E9%85%8D%E7%BD%AE_%E9%85%8D%E7%BD%AEWebStatFilter)
+
+下面是java配置方式
+
+```java
+    /**
+     * 注册web监控的过滤器
+     */
+    @Bean
+    public FilterRegistrationBean webStatFilter()
+    {
+        FilterRegistrationBean bean = new FilterRegistrationBean();
+        bean.setFilter(new WebStatFilter());
+
+        Map<String,String> map = new HashMap<>();
+        //排除一些不必要的url
+        map.put("exclusions","*.js,*.css,/druid/*");
+        bean.setInitParameters(map);
+        bean.setUrlPatterns(Arrays.asList("/**")    );
+        return bean;
+    }
+```
+
+### 5.mybatis整合
+
+引入mybatis的starter
+
+```xml
+<dependency>
+    <groupId>org.mybatis.spring.boot</groupId>
+    <artifactId>mybatis-spring-boot-starter</artifactId>
+    <version>2.1.0</version>
+</dependency>
+```
+
+相比于springmvc，不用写很多的xml
+
+创建数据表
+
+创建对应Pojo
+
+写一个mapper接口将上述对应起来
+
+这里有两种方法
+
+- 注解
+
+```java
+@Select("select * from department where id=#{id}")
+public Department getDepartmentById(Integer id);
+```
+
+- xml
+
+>  在yml或使用java类中配置配置文件的路径，然后将mybatis配置和pojo的映射xml放在路径下即可
+
+这些和以前都一样
+
+下面说说自动配置原理
+
+首先找到自动配置类
+
+```java
+public class MybatisAutoConfiguration implements InitializingBean {
+
+  private final MybatisProperties properties;
+｝
+```
+
+看到这个就应该知道是干什么的了吧，标准的xxxProperties格式
+
+进入*MybatisProperties*
+
+```java
+@ConfigurationProperties(prefix = MybatisProperties.MYBATIS_PREFIX)
+public class MybatisProperties {
+
+  public static final String MYBATIS_PREFIX = "mybatis";
+
+    ...
+}
+```
+
+默认配置前缀为*mybatis*,也就是在application.yml或properties中以*mybatis*开头
+
+*MybatisProperties*类中有个属性config
+
+```java
+  /**
+   * A Configuration object for customize default settings. If {@link #configLocation} is specified, this property is
+   * not used.
+   */
+  @NestedConfigurationProperty
+  private Configuration configuration;
+```
+
+注释说这个类是自定义默认设置的，也就是我们用来配置mybatis的
+
+这个配置类里面有很多mybatis属性
+
+这里把分段命名和驼峰命名的转换开启
+
+```yaml
+mybatis:
+    configuration:
+      mapUnderscoreToCamelCase: true
+```
+
+也可以使用定制配置类
+
+```java
+    @Bean
+    public ConfigurationCustomizer configurationCustomizer()
+    {
+        return new ConfigurationCustomizer(){
+
+            @Override
+            public void customize(org.apache.ibatis.session.Configuration configuration) {
+                configuration.setMapUnderscoreToCamelCase(true);
+            }
+        };
+    }
+```
+
+### 6.jpa整合
 
 
 
